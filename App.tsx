@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider } from 'react-redux';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { store, useAppSelector } from './src/store';
 import { AppNavigator } from './src/navigation';
 import { StorageService } from './src/services/storage';
+import { setProjects } from './src/store/projectSlice';
+import { setTasks } from './src/store/taskSlice';
+import { setDarkMode } from './src/store/appSlice';
+import { LottieSplash } from './src/components';
+import { NotificationService } from './src/services/notifications';
 
 const AppContent: React.FC = () => {
   const isDarkMode = useAppSelector((state) => state.app.isDarkMode);
@@ -19,22 +24,40 @@ const AppContent: React.FC = () => {
 };
 
 const AppWrapper: React.FC = () => {
-  const [isReady, setIsReady] = useState(false);
+  const [isStorageReady, setIsStorageReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     const initApp = async () => {
       await StorageService.init();
-      setIsReady(true);
+      // Load persisted data into Redux store after storage is initialized
+      store.dispatch(setProjects(StorageService.getProjects()));
+      store.dispatch(setTasks(StorageService.getTasks()));
+      store.dispatch(setDarkMode(StorageService.getDarkMode()));
+
+      // Initialize notifications
+      await NotificationService.init();
+
+      setIsStorageReady(true);
     };
     initApp();
   }, []);
 
-  if (!isReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200EE" />
-      </View>
-    );
+  const handleSplashFinish = useCallback(() => {
+    if (isStorageReady) {
+      setShowSplash(false);
+    }
+  }, [isStorageReady]);
+
+  // Keep showing splash until both animation finishes AND storage is ready
+  useEffect(() => {
+    if (isStorageReady && !showSplash) {
+      // Ready to show app
+    }
+  }, [isStorageReady, showSplash]);
+
+  if (showSplash || !isStorageReady) {
+    return <LottieSplash onAnimationFinish={handleSplashFinish} />;
   }
 
   return (
@@ -55,11 +78,5 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
   },
 });

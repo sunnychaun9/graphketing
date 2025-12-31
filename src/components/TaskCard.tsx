@@ -5,11 +5,13 @@ import Animated, {
   useSharedValue,
   withSpring,
   runOnJS,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Task, TaskStatus } from '../types';
 import { Theme } from '../utils/theme';
 import { COLUMN_WIDTH } from '../utils/constants';
+import * as DeviceUtils from '../../modules/device-utils/src';
 
 interface TaskCardProps {
   task: Task;
@@ -17,10 +19,11 @@ interface TaskCardProps {
   onPress: (task: Task) => void;
   onDragEnd: (taskId: string, newStatus: TaskStatus) => void;
   columnPositions: { [key in TaskStatus]: number };
+  activeDropColumn: SharedValue<string>;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = React.memo(
-  ({ task, theme, onPress, onDragEnd, columnPositions }) => {
+  ({ task, theme, onPress, onDragEnd, columnPositions, activeDropColumn }) => {
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
@@ -28,6 +31,7 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(
     const opacity = useSharedValue(1);
 
     const determineColumn = (x: number): TaskStatus => {
+      'worklet';
       const todoEnd = columnPositions.todo + COLUMN_WIDTH;
       const inProgressEnd = columnPositions.inProgress + COLUMN_WIDTH;
 
@@ -45,14 +49,25 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(
       .onUpdate((event) => {
         translateX.value = event.translationX;
         translateY.value = event.translationY;
+
+        // Update active drop column for highlight effect
+        const currentColumnX = columnPositions[task.status];
+        const absoluteX = currentColumnX + event.translationX + COLUMN_WIDTH / 2;
+        const hoverColumn = determineColumn(absoluteX);
+        activeDropColumn.value = hoverColumn;
       })
       .onEnd((event) => {
         const currentColumnX = columnPositions[task.status];
         const absoluteX = currentColumnX + event.translationX + COLUMN_WIDTH / 2;
         const newStatus = determineColumn(absoluteX);
 
+        // Clear active drop column
+        activeDropColumn.value = '';
+
         if (newStatus !== task.status) {
           runOnJS(onDragEnd)(task.id, newStatus);
+          // Vibrate on successful status change
+          runOnJS(DeviceUtils.vibrateSuccess)();
         }
 
         translateX.value = withSpring(0);

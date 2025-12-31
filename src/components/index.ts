@@ -5,3 +5,4 @@ export { KanbanColumn } from './KanbanColumn';
 export { FloatingButton } from './FloatingButton';
 export { AddModal } from './AddModal';
 export { SearchBar } from './SearchBar';
+export { LottieSplash } from './LottieSplash';

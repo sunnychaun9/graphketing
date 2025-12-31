@@ -13,12 +13,15 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useAppSelector, useAppDispatch } from '../store';
 import { updateTask, deleteTask } from '../store/taskSlice';
 import { RootStackParamList, Task, TaskStatus } from '../types';
 import { getTheme } from '../utils/theme';
 import { USERS } from '../utils/constants';
 import { useSync } from '../hooks';
+import { ImageCacheService } from '../services/imageCache';
+import { NotificationService } from '../services/notifications';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetails'>;
 
@@ -38,6 +41,7 @@ export const TaskDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [showUserPicker, setShowUserPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleFieldChange = useCallback(
     (field: keyof Task, value: string | number) => {
@@ -47,13 +51,32 @@ export const TaskDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     [dispatch, taskId, performSync]
   );
 
+  const handleDateChange = useCallback(
+    async (event: DateTimePickerEvent, selectedDate?: Date) => {
+      setShowDatePicker(Platform.OS === 'ios');
+      if (selectedDate && task) {
+        handleFieldChange('dueDate', selectedDate.toISOString());
+        // Schedule notification for the new due date
+        await NotificationService.scheduleDueTaskNotification({
+          ...task,
+          dueDate: selectedDate.toISOString(),
+        });
+      }
+    },
+    [handleFieldChange, task]
+  );
+
   const handleDeleteTask = useCallback(() => {
     Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          // Cancel any scheduled notifications for this task
+          await NotificationService.cancelTaskNotification(taskId);
+          // Delete cached image if exists
+          await ImageCacheService.deleteCachedImage(taskId);
           dispatch(deleteTask(taskId));
           navigation.goBack();
         },
@@ -70,9 +93,14 @@ export const TaskDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      handleFieldChange('imageUri', result.assets[0].uri);
+      // Cache the image for offline access
+      const cachedUri = await ImageCacheService.cacheImage(
+        result.assets[0].uri,
+        taskId
+      );
+      handleFieldChange('imageUri', cachedUri);
     }
-  }, [handleFieldChange]);
+  }, [handleFieldChange, taskId]);
 
   const handleGoBack = useCallback(() => {
     navigation.goBack();
@@ -259,16 +287,28 @@ export const TaskDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Due Date */}
         <View style={styles.field}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Due Date</Text>
-          <View
+          <TouchableOpacity
             style={[
               styles.picker,
               { backgroundColor: theme.surface, borderColor: theme.border },
             ]}
+            onPress={() => setShowDatePicker(true)}
           >
             <Text style={[styles.pickerText, { color: theme.text }]}>
               {formatDate(task.dueDate)}
             </Text>
-          </View>
+            <Text style={[styles.pickerArrow, { color: theme.textSecondary }]}>📅</Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={new Date(task.dueDate)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleDateChange}
+              themeVariant={isDarkMode ? 'dark' : 'light'}
+            />
+          )}
         </View>
 
         {/* Estimated Hours */}

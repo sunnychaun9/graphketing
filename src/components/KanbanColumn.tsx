@@ -2,8 +2,8 @@ import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+  withSpring,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Task, TaskStatus } from '../types';
 import { TaskCard } from './TaskCard';
@@ -19,6 +19,7 @@ interface KanbanColumnProps {
   onTaskPress: (task: Task) => void;
   onTaskDragEnd: (taskId: string, newStatus: TaskStatus) => void;
   onAddTask: (status: TaskStatus) => void;
+  activeDropColumn: SharedValue<string>;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(
@@ -31,10 +32,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(
     onTaskPress,
     onTaskDragEnd,
     onAddTask,
+    activeDropColumn,
   }) => {
-    const scale = useSharedValue(1);
-    const backgroundColor = useSharedValue(0);
-
     const getColumnColor = () => {
       switch (status) {
         case 'todo':
@@ -61,9 +60,15 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(
       onAddTask(status);
     }, [onAddTask, status]);
 
-    const animatedColumnStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-    }));
+    const animatedColumnStyle = useAnimatedStyle(() => {
+      const isActive = activeDropColumn.value === status;
+      return {
+        transform: [{ scale: withSpring(isActive ? 1.02 : 1, { damping: 15 }) }],
+        opacity: withSpring(isActive ? 0.9 : 1, { damping: 15 }),
+        borderWidth: isActive ? 2 : 0,
+        borderColor: isActive ? '#FFFFFF' : 'transparent',
+      };
+    });
 
     const renderTask = useCallback(
       ({ item }: { item: Task }) => (
@@ -73,9 +78,10 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(
           onPress={onTaskPress}
           onDragEnd={onTaskDragEnd}
           columnPositions={columnPositions}
+          activeDropColumn={activeDropColumn}
         />
       ),
-      [theme, onTaskPress, onTaskDragEnd, columnPositions]
+      [theme, onTaskPress, onTaskDragEnd, columnPositions, activeDropColumn]
     );
 
     const keyExtractor = useCallback((item: Task) => item.id, []);

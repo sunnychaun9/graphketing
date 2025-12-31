@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue } from 'react-native-reanimated';
 import { useAppSelector, useAppDispatch } from '../store';
 import { addTask, updateTaskStatus } from '../store/taskSlice';
 import { KanbanColumn, AddModal } from '../components';
@@ -30,6 +30,9 @@ export const KanbanBoardScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedColumn, setSelectedColumn] = useState<TaskStatus>('todo');
+
+  // Shared value for column hover highlight
+  const activeDropColumn = useSharedValue('');
 
   const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
 
@@ -133,6 +136,7 @@ export const KanbanBoardScreen: React.FC<Props> = ({ navigation, route }) => {
             onTaskPress={handleTaskPress}
             onTaskDragEnd={handleTaskDragEnd}
             onAddTask={handleAddTask}
+            activeDropColumn={activeDropColumn}
           />
           <KanbanColumn
             title="In Progress"
@@ -143,6 +147,7 @@ export const KanbanBoardScreen: React.FC<Props> = ({ navigation, route }) => {
             onTaskPress={handleTaskPress}
             onTaskDragEnd={handleTaskDragEnd}
             onAddTask={handleAddTask}
+            activeDropColumn={activeDropColumn}
           />
           <KanbanColumn
             title="Done"
@@ -153,6 +158,7 @@ export const KanbanBoardScreen: React.FC<Props> = ({ navigation, route }) => {
             onTaskPress={handleTaskPress}
             onTaskDragEnd={handleTaskDragEnd}
             onAddTask={handleAddTask}
+            activeDropColumn={activeDropColumn}
           />
         </ScrollView>
       </Animated.View>

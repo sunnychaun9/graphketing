@@ -53,7 +53,8 @@ export const AddModal: React.FC<AddModalProps> = ({
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <TouchableOpacity style={styles.backdrop} onPress={handleClose} activeOpacity={1}>
           <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.backdrop} />
